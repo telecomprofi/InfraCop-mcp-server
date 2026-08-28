@@ -85,7 +85,7 @@ export const SIMILAR_SOLUTIONS = [
     name: "aws-samples/sample-serverless-mcp-servers",
     url: "https://github.com/aws-samples/sample-serverless-mcp-servers",
     fit: "Stateless Streamable HTTP MCP on Lambda + API Gateway (Python).",
-    verdict: "Remix the Lambda/API Gateway shape and stateless_http flags.",
+    verdict: "Remix the stateless HTTP Lambda adapter. We front it with an ALB in a dedicated VPC instead of API Gateway.",
   },
   {
     name: "Ran Isenberg aws-lambda-mcp-cookbook",
@@ -115,6 +115,31 @@ export const SIMILAR_SOLUTIONS = [
 
 export const ARCHITECTURE_NODES = [
   {
+    id: "account",
+    title: "Dedicated AWS account",
+    detail: "Own account, own VPC. No peering, no shared subnets, no sibling tools in the same blast radius.",
+  },
+  {
+    id: "vpc",
+    title: "Isolated VPC",
+    detail: "10.42.0.0/16 across two AZs. Public subnets for ALB/NAT. Private subnets for Lambdas. Flow logs on.",
+  },
+  {
+    id: "alb",
+    title: "Application Load Balancer",
+    detail: "Internet-facing TLS front door. /mcp and /health → MCP Lambda. /ingest → webhook Lambda. Only ingress.",
+  },
+  {
+    id: "nat",
+    title: "NAT Gateways",
+    detail: "One per AZ. Private Lambdas reach Qdrant Cloud and GitHub without public IPs.",
+  },
+  {
+    id: "endpoints",
+    title: "VPC endpoints",
+    detail: "Interface: Bedrock Runtime, Logs, Secrets, SQS, STS, monitoring. Gateway: S3. AWS APIs never hairpin NAT.",
+  },
+  {
     id: "github",
     title: "Standards repo",
     detail: "GitHub release of Ent-DevOps-Standards. Individual .md files.",
@@ -122,12 +147,12 @@ export const ARCHITECTURE_NODES = [
   {
     id: "hook",
     title: "HTTPS webhook",
-    detail: "API Gateway HMAC-verified /ingest. DLQ on failure.",
+    detail: "ALB /ingest, HMAC-verified. DLQ on failure.",
   },
   {
     id: "ingest",
     title: "Ingest Lambda",
-    detail: "Zipball → markdown chunk → Titan v2 → Qdrant upsert by rule id.",
+    detail: "Private subnet. Zipball → markdown chunk → Titan v2 → Qdrant upsert by rule id.",
   },
   {
     id: "qdrant",
@@ -137,7 +162,7 @@ export const ARCHITECTURE_NODES = [
   {
     id: "mcp",
     title: "MCP Lambda",
-    detail: "FastMCP stateless HTTP. Provisioned concurrency 3. Reserved 25.",
+    detail: "Private subnet. FastMCP stateless HTTP. Provisioned concurrency 3. Reserved 25.",
   },
   {
     id: "agents",

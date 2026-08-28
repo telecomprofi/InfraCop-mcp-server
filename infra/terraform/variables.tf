@@ -54,3 +54,27 @@ variable "image_uri" {
   type        = string
   description = "ECR image URI built from mcp-server/Dockerfile"
 }
+
+variable "vpc_cidr" {
+  type        = string
+  default     = "10.42.0.0/16"
+  description = "Dedicated VPC CIDR. Chosen to avoid 10.0.0.0/16 collisions if this account is later attached to a landing zone."
+}
+
+variable "nat_gateway_count" {
+  type        = number
+  default     = 2
+  description = "NAT Gateways in public subnets (1 = cheaper, 2 = multi-AZ for 99% availability)."
+}
+
+variable "acm_certificate_arn" {
+  type        = string
+  default     = ""
+  description = "ACM cert in us-east-1 for the ALB HTTPS listener. Empty = HTTP only (not for production)."
+}
+
+variable "allowed_ingress_cidrs" {
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+  description = "CIDRs allowed to the ALB. Restrict to GitHub webhook + agent egress ranges in production."
+}

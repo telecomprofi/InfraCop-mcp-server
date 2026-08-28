@@ -5,10 +5,11 @@ export function ArchitecturePage() {
     <div className="space-y-10">
       <header className="max-w-2xl">
         <p className="text-[11px] uppercase tracking-[0.18em] text-accent">AWS</p>
-        <h1 className="mt-2 text-3xl font-medium tracking-tight">Serverless control plane</h1>
+        <h1 className="mt-2 text-3xl font-medium tracking-tight">Isolated control plane</h1>
         <p className="mt-3 text-muted leading-relaxed">
-          Two Lambdas, one HTTP API, Qdrant Cloud, Bedrock Titan V2. No EKS, no
-          RDS, no always-on containers. Designed for 99% availability, 20
+          Two Lambdas in private subnets, an internet-facing ALB, dual-AZ NAT,
+          and VPC endpoints — in a dedicated AWS account. Qdrant Cloud and
+          Bedrock Titan V2. No EKS, no RDS. Designed for 99% availability, 20
           simultaneous agents, and warm p99 under 500ms.
         </p>
       </header>
@@ -37,17 +38,17 @@ export function ArchitecturePage() {
             <tbody className="text-muted">
               <tr className="border-t border-border">
                 <td className="py-3 text-fg">99% availability</td>
-                <td className="py-3">Lambda 99.95% + HTTP API 99.95% + Qdrant Cloud with a replica. Multi-AZ by default.</td>
+                <td className="py-3">Lambda 99.95% + ALB 99.99% + NAT per AZ + Qdrant Cloud replica. Multi-AZ VPC.</td>
                 <td className="py-3 font-mono text-xs">~99.8% design vs 7.3h/month budget</td>
               </tr>
               <tr className="border-t border-border">
                 <td className="py-3 text-fg">Minimum infra</td>
-                <td className="py-3">No ECS/EKS. Qdrant Cloud instead of self-hosted. Embeddings via Bedrock, not a GPU box.</td>
-                <td className="py-3 font-mono text-xs">about 35-70 USD / month at this scale</td>
+                <td className="py-3">No ECS/EKS. Dedicated VPC/ALB/NAT for account isolation. Qdrant Cloud. Bedrock embeddings.</td>
+                <td className="py-3 font-mono text-xs">about 230-290 USD / month with HA NAT + Qdrant</td>
               </tr>
               <tr className="border-t border-border">
                 <td className="py-3 text-fg">20 simultaneous agents</td>
-                <td className="py-3">Reserved concurrency 25 on the MCP Lambda. HTTP API scales independently.</td>
+                <td className="py-3">Reserved concurrency 25 on the MCP Lambda. ALB scales independently.</td>
                 <td className="py-3 font-mono text-xs">burst well above 20</td>
               </tr>
               <tr className="border-t border-border">
@@ -69,16 +70,16 @@ export function ArchitecturePage() {
         <article className="rounded-xl border border-border bg-surface p-5">
           <h2 className="font-medium">Private by default</h2>
           <ul className="mt-3 space-y-2 text-sm text-muted">
-            <li>HTTP API is not on the public internet without an API key. Per-team keys in Secrets Manager, Lambda authorizer, usage-plan throttles.</li>
-            <li>Optional VPC Lattice / PrivateLink if agents only run inside the landing zone.</li>
-            <li>Qdrant API key and GitHub webhook secret in Secrets Manager. No long-lived AWS keys — OIDC for GitHub.</li>
-            <li>Embeddings stay in-account on Bedrock. Standards never leave AWS unless you opt into voyage-code-3.</li>
+            <li>Internet-facing ALB is the only ingress. Per-team API keys checked in the Lambda. Restrict allowed_ingress_cidrs in production.</li>
+            <li>Lambdas have no public IPs. Outbound to Qdrant and GitHub via NAT. Bedrock, Logs, Secrets, SQS stay on VPC endpoints.</li>
+            <li>Dedicated AWS account — no VPC peering, no shared subnets, no sibling tools in this blast radius.</li>
+            <li>Qdrant API key and GitHub webhook secret in Secrets Manager. Embeddings stay in-account on Bedrock.</li>
           </ul>
         </article>
         <article className="rounded-xl border border-border bg-surface p-5">
           <h2 className="font-medium">Deploy shape</h2>
           <ul className="mt-3 space-y-2 text-sm text-muted">
-            <li>Terraform in <code className="font-mono text-accent">infra/terraform</code> — HTTP API, two Lambdas, IAM, alarms, DLQ.</li>
+            <li>Terraform in <code className="font-mono text-accent">infra/terraform</code> — VPC, NAT, ALB, two Lambdas, endpoints, IAM, alarms, DLQ.</li>
             <li>Python package in <code className="font-mono text-accent">mcp-server</code> — FastMCP, LangChain Qdrant, Bedrock embeddings, fail-closed validator.</li>
             <li>Ingest Lambda shares the chunker with the console so a release cannot drift from what agents retrieve.</li>
             <li>CloudWatch p99 + 5xx + ingest-lag alarms; traces via X-Ray.</li>

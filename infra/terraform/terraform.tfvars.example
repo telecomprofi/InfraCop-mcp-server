@@ -1,0 +1,19 @@
+aws_region = "us-east-1"
+name       = "infracop-mcp"
+
+# Dedicated isolated account — apply only here. No peering.
+vpc_cidr           = "10.42.0.0/16"
+nat_gateway_count  = 2
+acm_certificate_arn = "" # arn:aws:acm:us-east-1:ACCOUNT:certificate/...
+allowed_ingress_cidrs = ["0.0.0.0/0"]
+
+image_uri = "ACCOUNT.dkr.ecr.us-east-1.amazonaws.com/infracop-mcp:latest"
+
+qdrant_url              = "https://YOUR-CLUSTER.qdrant.io:6333"
+qdrant_api_key          = ""
+github_webhook_secret   = ""
+mcp_api_keys            = ""
+github_token            = ""
+standards_repo          = "telecomprofi/Ent-DevOps-Standards"
+provisioned_concurrency = 3
+reserved_concurrency    = 25

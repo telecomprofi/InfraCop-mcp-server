@@ -56,3 +56,8 @@ resource "aws_iam_role_policy" "lambda" {
   role   = aws_iam_role.lambda.id
   policy = data.aws_iam_policy_document.lambda.json
 }
+
+resource "aws_iam_role_policy_attachment" "lambda_vpc" {
+  role       = aws_iam_role.lambda.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}

@@ -20,7 +20,7 @@ Never omit mandatory tags. Never invent names that violate the 47-character keba
 export const MCP_JSON = {
   mcpServers: {
     "infracop-mcp": {
-      url: "https://mcp.infracop.internal/mcp",
+      url: "https://REPLACE_ME.us-east-1.elb.amazonaws.com/mcp",
       headers: {
         Authorization: "Bearer ${INFRACOP_MCP_TOKEN}",
       },

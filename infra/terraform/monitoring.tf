@@ -41,3 +41,18 @@ resource "aws_cloudwatch_metric_alarm" "ingest_dlq" {
     QueueName = aws_sqs_queue.ingest_dlq.name
   }
 }
+
+resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
+  alarm_name          = "${var.name}-alb-5xx"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "HTTPCode_Target_5XX_Count"
+  namespace           = "AWS/ApplicationELB"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 2
+  treat_missing_data  = "notBreaching"
+  dimensions = {
+    LoadBalancer = aws_lb.this.arn_suffix
+  }
+}

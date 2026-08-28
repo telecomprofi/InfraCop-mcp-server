@@ -9,7 +9,7 @@ This repo is the control plane:
 | Path | What it is |
 | --- | --- |
 | [`mcp-server/`](mcp-server/) | Python MCP (FastMCP + LangChain + Qdrant), Lambda container |
-| [`infra/terraform/`](infra/terraform/) | Serverless AWS: HTTP API, two Lambdas, secrets, alarms |
+| [`infra/terraform/`](infra/terraform/) | Isolated AWS account: VPC, NAT, ALB, two Lambdas, endpoints, alarms |
 | [`agent-config/`](agent-config/) | Mandatory `mcp.json` + `AGENTS.md` for every Terraform repo |
 | [`src/`](src/) | Operator console — corpus, inspector (traffic-light), playground, leadership briefing |
 | [`public/infracop-leadership-brief.pptx`](public/infracop-leadership-brief.pptx) | Leadership deck (import into Google Slides) |
@@ -68,22 +68,32 @@ Recommended-only findings do not move the light.
 - **Store:** Qdrant Cloud, HNSW. Payload: `rule_id`, `domain`, `severity`, `heading_path`, `release`.
 - **Query:** dense kNN + BM25 rerank + synonym expansion. No generative LLM on the retrieve path (warm p99 budget < 500 ms).
 
-## Deploy (AWS, serverless)
+## Deploy (isolated AWS account)
 
-NFRs: 99% availability, minimum always-on infra, ≥ 20 concurrent agents, warm p99 < 500 ms (first request 3–4 s acceptable).
+Apply this stack in a **dedicated AWS account**. No VPC peering, no shared subnets, no sibling tools in the same blast radius. The internet-facing ALB is the only ingress.
+
+NFRs: 99% availability, ≥ 20 concurrent agents, warm p99 < 500 ms (first request 3–4 s acceptable).
 
 ```text
-GitHub release ──► ingest Lambda ──► Qdrant Cloud
-Agents / console ──► HTTP API (API key) ──► MCP Lambda (FastMCP, provisioned concurrency 3, reserved 25)
+Internet ──► ALB (public subnets, TLS)
+               ├─ /mcp /health ──► MCP Lambda (private subnets, PC=3)
+               └─ /ingest      ──► Ingest Lambda (private subnets)
+                                      │
+                                      ├─ NAT GW × 2 AZs ──► Qdrant Cloud, GitHub
+                                      └─ VPC endpoints ──► Bedrock, Logs, Secrets, SQS, STS
 ```
 
-1. Stand up a Qdrant Cloud cluster (replica for availability).
-2. Build and push `mcp-server/Dockerfile` to ECR.
-3. `terraform apply` in `infra/terraform` with Qdrant URL, webhook secret, and per-team API keys.
-4. Point the Ent-DevOps-Standards **release** webhook at the ingest URL.
-5. Copy [`agent-config/mcp.json`](agent-config/mcp.json) and [`agent-config/AGENTS.md`](agent-config/AGENTS.md) into every application Terraform repo. Treat them as required, not optional.
+1. Create or reuse an empty AWS account. Do not share its VPC with other workloads.
+2. Stand up a Qdrant Cloud cluster with a replica (availability).
+3. Build and push `mcp-server/Dockerfile` to ECR in this account.
+4. Copy [`infra/terraform/terraform.tfvars.example`](infra/terraform/terraform.tfvars.example) → `terraform.tfvars`. Set `acm_certificate_arn` for HTTPS.
+5. `terraform apply` in `infra/terraform`.
+6. Point the Ent-DevOps-Standards **release** webhook at the ingest URL on the ALB.
+7. Copy [`agent-config/mcp.json`](agent-config/mcp.json) and [`agent-config/AGENTS.md`](agent-config/AGENTS.md) into every application Terraform repo.
 
 Copy [`.env.example`](.env.example) for local MCP runs. Do not commit secrets.
+
+Indicative us-east-1 on-demand cost with 2 NAT Gateways, ALB, VPC endpoints, PC=3, and Qdrant HA: **about $230–290 / month**.
 
 ## Agent config (mandatory)
 
@@ -93,7 +103,7 @@ Every infrastructure repository must list InfraCop **first**. Conflict rule: if 
 {
   "mcpServers": {
     "infracop-mcp": {
-      "url": "https://REPLACE_ME.execute-api.us-east-1.amazonaws.com/mcp",
+      "url": "https://REPLACE_ME.us-east-1.elb.amazonaws.com/mcp",
       "headers": { "Authorization": "Bearer ${INFRACOP_MCP_TOKEN}" }
     }
   }

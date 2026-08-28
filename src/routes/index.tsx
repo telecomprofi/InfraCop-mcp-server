@@ -61,7 +61,7 @@ function Home() {
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SloCard title="Availability" value="99.8% design" note="Target 99%. Lambda + HTTP API + Qdrant Cloud replica." />
+        <SloCard title="Availability" value="99.8% design" note="Target 99%. Isolated VPC + ALB + dual-AZ NAT + Qdrant replica." />
         <SloCard title="Concurrency" value="25 reserved" note="Headroom above 20 simultaneous agents." />
         <SloCard title="Warm latency" value="< 500ms" note="Provisioned concurrency 3. Cold start 3–4s accepted." />
         <SloCard title="Precedence" value="100" note="InfraCop beats Terraform MCP (40) and AWS MCP (30)." />
@@ -89,7 +89,7 @@ function Home() {
         <Jump to="/standards" icon={BookOpen} title="Browse standards" copy="Five markdown files. One live from GitHub, four seeded for the next release." />
         <Jump to="/playground" icon={Search} title="Hybrid retrieve" copy="Ask as an agent would. See ranked chunks and how other MCPs would lose the conflict." />
         <Jump to="/inspector" icon={Terminal} title="Fail-closed lint" copy="Paste HCL. InfraCop checks tags, names, regions, and public databases." />
-        <Jump to="/architecture" icon={Shield} title="Serverless on AWS" copy="Two Lambdas, HTTP API, Qdrant Cloud, Bedrock Titan V2. No cluster to babysit." />
+        <Jump to="/architecture" icon={Shield} title="Isolated AWS account" copy="Dedicated VPC, ALB, dual-AZ NAT, private Lambdas, VPC endpoints. Qdrant Cloud and Bedrock Titan V2." />
         <Jump to="/pipeline" icon={GitBranch} title="Release ingest" copy="GitHub release webhook chunks, embeds, and upserts. Previous rule ids are replaced." />
         <Jump to="/research" icon={Search} title="Why this stack" copy="Embedding and chunking decision, plus the open-source pieces we remixed instead of rebuilt." />
       </section>

@@ -17,6 +17,11 @@ locals {
     INFRACOP_QDRANT_URL      = var.qdrant_url
     INFRACOP_QDRANT_API_KEY  = var.qdrant_api_key
   }
+
+  vpc_config = {
+    subnet_ids         = aws_subnet.private[*].id
+    security_group_ids = [aws_security_group.lambda.id]
+  }
 }
 
 resource "aws_lambda_function" "mcp" {
@@ -32,12 +37,19 @@ resource "aws_lambda_function" "mcp" {
   publish                        = true
   reserved_concurrent_executions = var.reserved_concurrency
   tracing_config { mode = "Active" }
+  vpc_config {
+    subnet_ids         = local.vpc_config.subnet_ids
+    security_group_ids = local.vpc_config.security_group_ids
+  }
   environment {
     variables = merge(local.common_env, {
       INFRACOP_API_KEYS = var.mcp_api_keys
     })
   }
-  depends_on = [aws_cloudwatch_log_group.mcp]
+  depends_on = [
+    aws_cloudwatch_log_group.mcp,
+    aws_iam_role_policy_attachment.lambda_vpc,
+  ]
 }
 
 resource "aws_lambda_alias" "mcp" {
@@ -63,6 +75,10 @@ resource "aws_lambda_function" "ingest" {
   memory_size = 1024
   timeout     = 60
   tracing_config { mode = "Active" }
+  vpc_config {
+    subnet_ids         = local.vpc_config.subnet_ids
+    security_group_ids = local.vpc_config.security_group_ids
+  }
   dead_letter_config {
     target_arn = aws_sqs_queue.ingest_dlq.arn
   }
@@ -73,22 +89,8 @@ resource "aws_lambda_function" "ingest" {
       INFRACOP_STANDARDS_REPO        = var.standards_repo
     })
   }
-  depends_on = [aws_cloudwatch_log_group.ingest]
-}
-
-resource "aws_lambda_permission" "apigw_mcp" {
-  statement_id  = "AllowAPIGatewayMCP"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.mcp.function_name
-  qualifier     = aws_lambda_alias.mcp.name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
-}
-
-resource "aws_lambda_permission" "apigw_ingest" {
-  statement_id  = "AllowAPIGatewayIngest"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.ingest.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
+  depends_on = [
+    aws_cloudwatch_log_group.ingest,
+    aws_iam_role_policy_attachment.lambda_vpc,
+  ]
 }

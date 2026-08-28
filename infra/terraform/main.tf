@@ -1,3 +1,9 @@
+# Isolated AWS account contract:
+# Apply this stack in a dedicated account. No VPC peering, Transit Gateway,
+# or shared subnets. The internet-facing ALB is the only ingress. Lambdas
+# run in private subnets; outbound to Qdrant/GitHub is via NAT; AWS APIs
+# stay on VPC interface endpoints (Bedrock, Logs, Secrets, SQS, STS).
+
 terraform {
   required_version = ">= 1.7.0"
   required_providers {
