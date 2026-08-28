@@ -1,0 +1,54 @@
+# Dependencies and caches
+node_modules/
+.tanstack/
+.nitro/
+.output/
+dist/
+.vercel/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Sandbox / local runtime
+.grok/
+.project_id
+.node_modules.lock
+artifacts/
+screenshots/*.png
+screenshots/*.json
+
+# Secrets and env
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Python / Docker
+*.egg-info/
+.coverage
+htmlcov/
+
+# Platform chrome not part of the product
+public/__grok/
+/AGENTS.md

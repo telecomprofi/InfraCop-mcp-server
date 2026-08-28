@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "infracop-mcp": {
+      "url": "https://REPLACE_ME.execute-api.us-east-1.amazonaws.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${INFRACOP_MCP_TOKEN}"
+      }
+    }
+  }
+}
