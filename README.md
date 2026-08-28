@@ -14,6 +14,18 @@ This repo is the control plane:
 | [`src/`](src/) | Operator console — corpus, inspector (traffic-light), playground, leadership briefing |
 | [`public/infracop-leadership-brief.pptx`](public/infracop-leadership-brief.pptx) | Leadership deck (import into Google Slides) |
 
+## InfraCop MCP server use workflow
+
+![InfraCop MCP server use workflow](docs/infracop-mcp-server-use-workflow.jpg)
+
+1. **Platform team** writes or updates a standard as `.md` and opens a PR on the Enterprise Standards GitHub repo.
+2. **DevOps / Infra team leads** review, approve, and merge.
+3. A **webhook** re-reads the standards. The MCP server chunks, embeds, and upserts **Qdrant** (RAG) in AWS.
+4. **Infra GitHub repos** hold Terraform plus mandatory MCP config that tells agents (Claude Code, GitHub Copilot) to use InfraCop first.
+5. Agents generate IaC; **DevOps / Infra teams** review and commit.
+6. That Terraform **defines** application infrastructure in AWS.
+7. **Datadog** monitors it and generates alerts; **SRE** responds to incidents.
+
 ## Why
 
 Without a single live standard, DevOps squads invent their own Terraform. Production certification slips. Auditors find public databases and missing owner tags. FinOps cannot allocate spend. On-call cannot page an owner for `db-prod` or a 17-character hash. Confluence pages and Copilot skill files go stale across 20+ accounts and two AWS Organizations.

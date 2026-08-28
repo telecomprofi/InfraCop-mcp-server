@@ -17,6 +17,7 @@ __pycache__/
 .project_id
 .node_modules.lock
 artifacts/
+attachments/
 screenshots/*.png
 screenshots/*.json
 
