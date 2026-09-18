@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Private enterprise DevOps standards MCP server (LangChain + Qdrant)"
 requires-python = ">=3.12"
 dependencies = [
-  "mcp>=1.9.0",
+  "mcp>=1.9.0,<2",
   "mangum>=0.19.0",
   "starlette>=0.41.0",
   "qdrant-client>=1.12.0",

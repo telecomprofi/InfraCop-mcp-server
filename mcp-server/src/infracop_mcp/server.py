@@ -173,13 +173,17 @@ async def health(_request):
 
 def asgi_app():
     app = mcp.streamable_http_app()
-    app.router.routes.insert(0, Route("/health", health, methods=["GET"]))
+    route = Route("/health", health, methods=["GET"])
+    routes = getattr(getattr(app, "router", None), "routes", None) or getattr(app, "routes", None)
+    if routes is not None:
+        routes.insert(0, route)
     return app
 
 
 def main() -> None:
     import uvicorn
 
+    log.info("starting infracop-mcp on %s:%s", settings.host, settings.mcp_port)
     uvicorn.run(
         "infracop_mcp.server:asgi_app",
         factory=True,
