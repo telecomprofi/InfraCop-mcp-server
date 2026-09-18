@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 import re
 from functools import lru_cache
@@ -9,6 +10,8 @@ from qdrant_client.http import models as qm
 
 from .embeddings import get_embeddings
 from .settings import settings
+
+log = logging.getLogger("infracop.retrieve")
 
 STOP = {
     "the", "a", "an", "and", "or", "of", "to", "for", "in", "on", "with", "by",
@@ -90,4 +93,14 @@ def retrieve(
         fused = float(point.score or 0) * 0.7 + lexical * 0.3
         ranked.append((fused, {**payload, "vector_score": point.score, "fused_score": fused}))
     ranked.sort(key=lambda x: x[0], reverse=True)
-    return [item for _, item in ranked[:limit]]
+    out = [item for _, item in ranked[:limit]]
+    log.info(
+        "qdrant query=%r domain=%s severity=%s points=%s returned=%s top=%s",
+        query[:180],
+        domain,
+        severity,
+        len(hits.points),
+        len(out),
+        [h.get("rule_id") for h in out],
+    )
+    return out
