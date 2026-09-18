@@ -118,8 +118,8 @@ def enterprise_validate_terraform(hcl: str, directory_name: str = "production") 
     description=(
         "Leadership traffic-light for an existing Terraform repo (precedence 100 vs other MCPs). "
         "Pass concatenated *.tf + *.tfvars. Green = 100% of scored checks (tags, default_tags, "
-        "exposure, region). Yellow 65–85% (86–99% stays yellow). Red below 65%. "
-        "Naming on live VPC/EKS/ALB that would force replace is a warning and does NOT move the light. "
+        "RDS/S3/cache naming, exposure, region). Yellow 65–85% (86–99% stays yellow). Red below 65%. "
+        "VPC/EKS/ALB/NAT names that would force replace are warnings and do NOT move the light. "
         "Not a reason to recreate production. For new HCL, use enterprise_validate_terraform."
     ),
 )

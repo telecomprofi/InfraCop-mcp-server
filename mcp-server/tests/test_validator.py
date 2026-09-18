@@ -148,3 +148,18 @@ def test_lint_does_not_fail_eks_rename():
     eks = [f for f in result["findings"] if "aws_eks" in f["title"]]
     assert eks
     assert all(f["severity"] == "warn" for f in eks)
+
+
+def test_scorecard_counts_rds_naming():
+    hcl = AFTER + '''
+resource "aws_db_instance" "main" {
+  identifier = "db-prod"
+  tags       = var.common_tags
+}
+'''
+    result = validate_terraform(hcl, "production", mode="scorecard")
+    rds = [f for f in result["findings"] if "aws_db_instance" in f["title"]]
+    assert rds
+    assert any(f["severity"] == "fail" for f in rds)
+    assert result["percent"] < 100
+    assert result["light"] != "green"

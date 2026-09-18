@@ -263,14 +263,14 @@ def validate_terraform(
                 continue
             recreate = _is_recreate_type(rtype)
             strict = rtype in STRICT_NAME_TYPES
-            if scorecard or recreate:
-                sev = "warn"
-                counts = False
-            elif strict or rtype.startswith("aws_"):
-                sev = "fail"
-                counts = True
+            if recreate:
+                sev, counts = "warn", False
+            elif strict:
+                sev, counts = "fail", True
+            elif scorecard:
+                sev, counts = "warn", False
             else:
-                continue
+                sev, counts = "fail", True
             if len(name) >= MAX_NAME:
                 findings.append(
                     {
