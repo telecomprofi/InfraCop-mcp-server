@@ -163,3 +163,20 @@ resource "aws_db_instance" "main" {
     assert any(f["severity"] == "fail" for f in rds)
     assert result["percent"] < 100
     assert result["light"] != "green"
+
+
+def test_findings_cite_section_and_version():
+    result = validate_terraform(GOOD, "production")
+    assert result["findings"]
+    for f in result["findings"]:
+        assert f["section"]
+        assert f["file"].endswith(".md")
+        assert f["ref"]
+        assert "version" in f
+    tagging = [f for f in result["findings"] if f["rule_id"] == "iac-terraform.mandatory-resource-tagging"]
+    assert tagging
+    assert tagging[0]["section"] == "Mandatory Resource tagging"
+    assert tagging[0]["ref"] == "iac-terraform.md#mandatory-resource-tagging"
+    naming = [f for f in result["findings"] if "naming" in f["rule_id"]]
+    assert naming
+    assert naming[0]["section"] == "Mandatory Resource Naming convention"

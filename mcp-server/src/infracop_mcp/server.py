@@ -138,6 +138,7 @@ def enterprise_compliance_score(hcl: str, directory_name: str = "production") ->
             "ok": result["ok"],
             "directory": directory_name,
             "mode": "scorecard",
+            "standards_version": result.get("standards_version"),
             "tags_detected": result.get("tags_detected", {}),
             "bands": {
                 "green": "100% of scored checks pass — all compliant",

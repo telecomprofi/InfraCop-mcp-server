@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 MANDATORY_TAGS = [
     "Organization",
@@ -69,6 +70,124 @@ RESOURCE_RE = re.compile(r'resource\s+"([^"]+)"\s+"([^"]+)"\s*\{', re.M)
 NAME_ATTR_RE = re.compile(
     r'\b(?:identifier|name|bucket|cluster_identifier)\s*=\s*"([^"]+)"'
 )
+
+# Maps validator rule_id -> published markdown section. Live heading/version
+# overlay from Qdrant when the corpus has been ingested.
+STANDARD_CATALOG = {
+    "iac-terraform.mandatory-resource-tagging": {
+        "file": "iac-terraform.md",
+        "section": "Mandatory Resource tagging",
+        "ref": "iac-terraform.md#mandatory-resource-tagging",
+    },
+    "iac-terraform.mandatory-resource-naming-convention": {
+        "file": "iac-terraform.md",
+        "section": "Mandatory Resource Naming convention",
+        "ref": "iac-terraform.md#mandatory-resource-naming-convention",
+    },
+    "iac-terraform.prepend-project": {
+        "file": "iac-terraform.md",
+        "section": "Mandatory Resource tagging",
+        "ref": "iac-terraform.md#mandatory-resource-tagging",
+    },
+    "security.network-exposure": {
+        "file": "security.md",
+        "section": "Network exposure",
+        "ref": "security.md#network-exposure",
+    },
+    "aws-infra.accounts-and-regions": {
+        "file": "aws-infra.md",
+        "section": "Accounts and regions",
+        "ref": "aws-infra.md#accounts-and-regions",
+    },
+    "aws-infra.weekend-cost-controls": {
+        "file": "aws-infra.md",
+        "section": "Weekend cost controls",
+        "ref": "aws-infra.md#weekend-cost-controls",
+    },
+}
+
+
+@lru_cache(maxsize=64)
+def cite_rule(rule_id: str) -> dict:
+    """Section + version for a rule. Qdrant payload wins when the corpus is loaded."""
+    base = STANDARD_CATALOG.get(
+        rule_id,
+        {
+            "file": f"{rule_id.split('.')[0]}.md",
+            "section": rule_id,
+            "ref": rule_id,
+        },
+    )
+    cite = {
+        "rule_id": rule_id,
+        "section": base["section"],
+        "file": base["file"],
+        "ref": base["ref"],
+        "version": "unknown",
+    }
+    live = _qdrant_cite(rule_id)
+    if live:
+        if live.get("section"):
+            cite["section"] = live["section"]
+        if live.get("file"):
+            cite["file"] = live["file"]
+            heading = live.get("section") or base["section"]
+            slug = re.sub(r"[^a-z0-9]+", "-", heading.lower()).strip("-")[:48]
+            cite["ref"] = f"{live['file']}#{slug}"
+        if live.get("version"):
+            cite["version"] = live["version"]
+        if live.get("heading_path"):
+            cite["heading_path"] = live["heading_path"]
+    return cite
+
+
+_QDRANT_OK: bool | None = None
+
+
+def _qdrant_cite(rule_id: str) -> dict | None:
+    global _QDRANT_OK
+    if _QDRANT_OK is False:
+        return None
+    try:
+        from qdrant_client.http import models as qm
+
+        from .retriever import get_client
+        from .settings import settings
+
+        points, _ = get_client().scroll(
+            collection_name=settings.collection,
+            scroll_filter=qm.Filter(
+                must=[qm.FieldCondition(key="rule_id", match=qm.MatchValue(value=rule_id))]
+            ),
+            limit=1,
+            with_payload=True,
+        )
+        _QDRANT_OK = True
+        if not points:
+            points, _ = get_client().scroll(
+                collection_name=settings.collection,
+                limit=1,
+                with_payload=True,
+            )
+            if points:
+                rel = (points[0].payload or {}).get("release")
+                return {"version": rel} if rel else None
+            return None
+        payload = dict(points[0].payload or {})
+        return {
+            "section": payload.get("heading"),
+            "file": payload.get("filename"),
+            "version": payload.get("release"),
+            "heading_path": payload.get("heading_path"),
+        }
+    except Exception:
+        _QDRANT_OK = False
+        return None
+
+
+def _with_cite(finding: dict) -> dict:
+    cite = cite_rule(finding["rule_id"])
+    return {**cite, **finding, "section": cite["section"], "version": cite["version"], "file": cite["file"], "ref": cite["ref"]}
 
 
 def _brace_block(hcl: str, from_idx: int) -> str | None:
@@ -365,6 +484,8 @@ def validate_terraform(
             "Escalate",
             "Block production certification until the gap closes.",
         )
+    cited = [_with_cite(f) for f in findings]
+    versions = sorted({c.get("version") or "unknown" for c in cited})
     return {
         "ok": fails == 0,
         "fail": fails,
@@ -376,6 +497,7 @@ def validate_terraform(
         "action": action,
         "directory": directory_name,
         "mode": mode,
+        "standards_version": versions[0] if len(versions) == 1 else versions,
         "tags_detected": {k: tags[k] for k in MANDATORY_TAGS if k in tags},
-        "findings": findings,
+        "findings": cited,
     }
