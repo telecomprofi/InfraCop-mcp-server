@@ -25,10 +25,17 @@ async def health(_request: Request) -> JSONResponse:
 
 
 async def ingest_route(request: Request) -> JSONResponse:
-    body = await request.body()
-    headers = {k.lower(): v for k, v in request.headers.items()}
-    status, payload = process_webhook(headers, body)
-    return JSONResponse(payload, status_code=status)
+    try:
+        body = await request.body()
+        headers = {k.lower(): v for k, v in request.headers.items()}
+        status, payload = process_webhook(headers, body)
+        return JSONResponse(payload, status_code=status)
+    except Exception as exc:
+        log.exception("ingest failed")
+        return JSONResponse(
+            {"error": type(exc).__name__, "detail": str(exc)},
+            status_code=500,
+        )
 
 
 def ingest_app() -> Starlette:

@@ -1,3 +1,5 @@
+import uuid
+
 from infracop_mcp.chunking import chunk_markdown
 
 
@@ -19,3 +21,5 @@ def test_h2_split_and_severity():
     assert any(c.severity == "mandatory" for c in chunks)
     assert all(c.domain == "iac" for c in chunks)
     assert all(c.release == "v1.0.0" for c in chunks)
+    for c in chunks:
+        uuid.UUID(c.id)

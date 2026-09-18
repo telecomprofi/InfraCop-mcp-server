@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import hashlib
 import re
+import uuid
 from dataclasses import dataclass, asdict
 
 SEVERITY_PATTERNS = [
@@ -119,7 +119,7 @@ def chunk_markdown(
             raw_id = f"{release}:{rule_id}"
             chunks.append(
                 Chunk(
-                    id=hashlib.sha1(raw_id.encode()).hexdigest(),
+                    id=str(uuid.uuid5(uuid.NAMESPACE_URL, raw_id)),
                     doc_id=doc_id,
                     filename=filename,
                     domain=domain,
