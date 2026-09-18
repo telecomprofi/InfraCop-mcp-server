@@ -95,7 +95,13 @@ Copy [`.env.example`](.env.example) for local MCP runs. Do not commit secrets.
 
 ## Local Docker
 
-Three services, each startable on its own. Hash embeddings are the default so nothing talks to Bedrock.
+Three services, each startable on its own. Hash embeddings are the default so nothing talks to Bedrock. **Build the app image once** (Compose used to build it twice in parallel, which fails on Docker Desktop while exporting `infracop-local:latest`).
+
+```bash
+cd InfraCop-mcp-server
+docker compose build
+docker compose up -d
+```
 
 | Service | What it is | Published |
 | --- | --- | --- |
@@ -143,6 +149,8 @@ docker run --rm -p 8766:8766 -e INFRACOP_QDRANT_URL=http://host.docker.internal:
 ```
 
 `mcp-server/Dockerfile` remains the AWS Lambda production image.
+
+If `exporting to image` / `naming to infracop-local:latest` fails: the pip install already succeeded; Docker Desktop choked on tagging. Run `docker compose build` (single image), then `docker compose up -d --no-build`. If it still fails, free disk in Docker Desktop (Settings → Resources) and `docker builder prune`.
 
 Indicative us-east-1 on-demand cost with 2 NAT Gateways, ALB, VPC endpoints, PC=3, and Qdrant HA: **about $230–290 / month**.
 

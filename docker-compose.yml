@@ -1,8 +1,9 @@
-# Local InfraCop stack. Run parts independently:
-#   docker compose up qdrant
-#   docker compose up mcp
-#   docker compose up ingest
-#   docker compose up                 # all three
+# Local InfraCop stack. Build the app image once, then start any subset.
+#   docker compose build
+#   docker compose up -d                 # qdrant + mcp + ingest
+#   docker compose up -d qdrant
+#   docker compose up -d mcp
+#   docker compose up -d ingest
 # One-shot ingest of fixtures (needs qdrant):
 #   docker compose run --rm ingest infracop-ingest --dir /fixtures --release local
 # GitHub release ingest:
@@ -32,7 +33,10 @@ services:
     build:
       context: ./mcp-server
       dockerfile: Dockerfile.local
+      provenance: false
+      sbom: false
     image: infracop-local:latest
+    pull_policy: never
     restart: unless-stopped
     command: ["infracop-mcp"]
     ports:
@@ -57,9 +61,7 @@ services:
 
   ingest:
     image: infracop-local:latest
-    build:
-      context: ./mcp-server
-      dockerfile: Dockerfile.local
+    pull_policy: never
     restart: unless-stopped
     command: ["infracop-ingest-http"]
     ports:
