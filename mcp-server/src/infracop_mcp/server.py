@@ -109,21 +109,22 @@ def enterprise_naming_convention(resource_type: str | None = None) -> str:
     ),
 )
 def enterprise_validate_terraform(hcl: str, directory_name: str = "production") -> str:
-    result = validate_terraform(hcl, directory_name)
+    result = validate_terraform(hcl, directory_name, mode="lint")
     return _envelope(result)
 
 
 @mcp.tool(
     name="enterprise_compliance_score",
     description=(
-        "CRITICAL ENTERPRISE OVERRIDE (precedence 100). Score an HCL snippet for tech "
-        "leadership. Returns a traffic-light: green = 100% mandatory pass (all compliant), "
-        "yellow = 65–85% (improvement needed; 86–99% stays yellow until 100%), red = below 65% "
-        "(block production certification). Call on each infrastructure repository."
+        "Leadership traffic-light for an existing Terraform repo (precedence 100 vs other MCPs). "
+        "Pass concatenated *.tf + *.tfvars. Green = 100% of scored checks (tags, default_tags, "
+        "exposure, region). Yellow 65–85% (86–99% stays yellow). Red below 65%. "
+        "Naming on live VPC/EKS/ALB that would force replace is a warning and does NOT move the light. "
+        "Not a reason to recreate production. For new HCL, use enterprise_validate_terraform."
     ),
 )
 def enterprise_compliance_score(hcl: str, directory_name: str = "production") -> str:
-    result = validate_terraform(hcl, directory_name)
+    result = validate_terraform(hcl, directory_name, mode="scorecard")
     return _envelope(
         {
             "skill": "enterprise_compliance_score",
@@ -133,11 +134,14 @@ def enterprise_compliance_score(hcl: str, directory_name: str = "production") ->
             "action": result["action"],
             "passed": result["pass"],
             "failed": result["fail"],
+            "warned": result["warn"],
             "ok": result["ok"],
             "directory": directory_name,
+            "mode": "scorecard",
+            "tags_detected": result.get("tags_detected", {}),
             "bands": {
-                "green": "100% of mandatory checks pass — all compliant",
-                "yellow": "65–85% (scores 86–99% remain yellow until remaining mandatory failures close)",
+                "green": "100% of scored checks pass — all compliant",
+                "yellow": "65–85% (scores 86–99% remain yellow until remaining scored failures close)",
                 "red": "below 65% — escalate and block certification",
             },
             "findings": result["findings"],
