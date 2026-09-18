@@ -1,3 +1,6 @@
+# AWS Lambda production image (ARM64).
+# For local Compose / Docker, use Dockerfile.local.
+
 FROM public.ecr.aws/lambda/python:3.12-arm64
 
 WORKDIR ${LAMBDA_TASK_ROOT}

@@ -178,7 +178,15 @@ def asgi_app():
 
 
 def main() -> None:
-    mcp.run(transport="streamable-http")
+    import uvicorn
+
+    uvicorn.run(
+        "infracop_mcp.server:asgi_app",
+        factory=True,
+        host=settings.host,
+        port=settings.mcp_port,
+        log_level=settings.log_level.lower(),
+    )
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import io
 import json
 import logging
@@ -21,7 +23,22 @@ def ensure_collection() -> None:
     client = get_client()
     names = [c.name for c in client.get_collections().collections]
     if settings.collection in names:
-        return
+        try:
+            info = client.get_collection(settings.collection)
+            vectors = info.config.params.vectors
+            size = vectors.size if hasattr(vectors, "size") else None
+            if size and size != settings.embedding_dims:
+                log.warning(
+                    "recreating %s (dim %s -> %s)",
+                    settings.collection,
+                    size,
+                    settings.embedding_dims,
+                )
+                client.delete_collection(settings.collection)
+            else:
+                return
+        except Exception:
+            return
     client.create_collection(
         collection_name=settings.collection,
         vectors_config=qm.VectorParams(
@@ -29,21 +46,12 @@ def ensure_collection() -> None:
             distance=qm.Distance.COSINE,
         ),
     )
-    client.create_payload_index(
-        collection_name=settings.collection,
-        field_name="domain",
-        field_schema=qm.PayloadSchemaType.KEYWORD,
-    )
-    client.create_payload_index(
-        collection_name=settings.collection,
-        field_name="severity",
-        field_schema=qm.PayloadSchemaType.KEYWORD,
-    )
-    client.create_payload_index(
-        collection_name=settings.collection,
-        field_name="rule_id",
-        field_schema=qm.PayloadSchemaType.KEYWORD,
-    )
+    for field in ("domain", "severity", "rule_id"):
+        client.create_payload_index(
+            collection_name=settings.collection,
+            field_name=field,
+            field_schema=qm.PayloadSchemaType.KEYWORD,
+        )
 
 
 def fetch_release_zipball(tag: str) -> bytes:
@@ -66,6 +74,16 @@ def markdown_from_zip(blob: bytes) -> list[tuple[str, str]]:
                 continue
             text = zf.read(info).decode("utf-8")
             out.append((name, text))
+    return out
+
+
+def markdown_from_dir(path: Path) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+    root = Path(path)
+    for p in sorted(root.rglob("*.md")):
+        if p.name.lower() == "readme.md":
+            continue
+        out.append((p.name, p.read_text(encoding="utf-8")))
     return out
 
 
@@ -102,13 +120,73 @@ def ingest_release(tag: str) -> dict:
     return result
 
 
+def ingest_directory(path: Path, release: str = "local") -> dict:
+    files = markdown_from_dir(path)
+    log.info("ingesting %s files from %s", len(files), path)
+    result = upsert_markdown(files, release=release)
+    log.info("ingest complete %s", json.dumps(result))
+    return result
+
+
+def valid_signature(secret: str, body: bytes, header: str) -> bool:
+    if not secret:
+        return True
+    if not header.startswith("sha256="):
+        return False
+    digest = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(f"sha256={digest}", header)
+
+
+def process_webhook(headers: dict[str, str], body: bytes) -> tuple[int, dict]:
+    headers = {k.lower(): v for k, v in headers.items()}
+    if not valid_signature(
+        settings.github_webhook_secret, body, headers.get("x-hub-signature-256", "")
+    ):
+        return 401, {"error": "bad signature"}
+
+    event_name = headers.get("x-github-event", "")
+    if event_name == "ping":
+        return 200, {"pong": True}
+
+    payload: dict = {}
+    if body:
+        try:
+            payload = json.loads(body.decode() or "{}")
+        except json.JSONDecodeError:
+            return 400, {"error": "invalid json"}
+
+    if event_name == "release":
+        if payload.get("action") != "published":
+            return 202, {"ignored": event_name, "action": payload.get("action")}
+        tag = (payload.get("release") or {}).get("tag_name")
+        if not tag:
+            return 400, {"error": "missing tag"}
+        return 200, ingest_release(tag)
+
+    if payload.get("tag"):
+        return 200, ingest_release(str(payload["tag"]))
+    if payload.get("dir"):
+        return 200, ingest_directory(Path(payload["dir"]), str(payload.get("release") or "local"))
+    if event_name:
+        return 202, {"ignored": event_name, "action": payload.get("action")}
+    return 400, {"error": "expected github release, or JSON {tag} / {dir}"}
+
+
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Ingest a GitHub release into Qdrant")
-    parser.add_argument("tag")
+    parser = argparse.ArgumentParser(description="Ingest standards into Qdrant")
+    parser.add_argument("tag", nargs="?", help="GitHub release tag (e.g. v1.0.0)")
+    parser.add_argument("--dir", dest="directory", help="Local directory of .md files")
+    parser.add_argument("--release", default="local", help="Release label when using --dir")
     args = parser.parse_args()
-    print(json.dumps(ingest_release(args.tag), indent=2))
+    if args.directory:
+        result = ingest_directory(Path(args.directory), args.release)
+    elif args.tag:
+        result = ingest_release(args.tag)
+    else:
+        parser.error("provide a GitHub tag or --dir")
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":

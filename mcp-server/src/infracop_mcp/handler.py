@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 import logging
 
 from mangum import Mangum
 
-from .ingest import ingest_release
+from .ingest import process_webhook
 from .server import asgi_app
 from .settings import settings
 
@@ -40,15 +38,6 @@ def handle_mcp(event, context):
     return mcp_handler(event, context)
 
 
-def _valid_signature(secret: str, body: bytes, header: str) -> bool:
-    if not secret:
-        return True
-    if not header.startswith("sha256="):
-        return False
-    digest = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(f"sha256={digest}", header)
-
-
 def handle_ingest(event, context):
     headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
     body = event.get("body") or ""
@@ -58,19 +47,5 @@ def handle_ingest(event, context):
         raw = base64.b64decode(body)
     else:
         raw = body.encode() if isinstance(body, str) else body
-
-    if not _valid_signature(settings.github_webhook_secret, raw, headers.get("x-hub-signature-256", "")):
-        return {"statusCode": 401, "body": json.dumps({"error": "bad signature"})}
-
-    event_name = headers.get("x-github-event", "")
-    payload = json.loads(raw.decode() or "{}")
-    if event_name == "ping":
-        return {"statusCode": 200, "body": json.dumps({"pong": True})}
-    if event_name != "release" or payload.get("action") != "published":
-        return {"statusCode": 202, "body": json.dumps({"ignored": event_name, "action": payload.get("action")})}
-
-    tag = (payload.get("release") or {}).get("tag_name")
-    if not tag:
-        return {"statusCode": 400, "body": json.dumps({"error": "missing tag"})}
-    result = ingest_release(tag)
-    return {"statusCode": 200, "body": json.dumps(result)}
+    status, payload = process_webhook(headers, raw)
+    return {"statusCode": status, "body": json.dumps(payload)}

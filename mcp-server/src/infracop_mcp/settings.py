@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     qdrant_api_key: str = ""
     collection: str = "enterprise_standards"
 
+    # bedrock (AWS) | fastembed (local model) | hash (zero-dep, wiring tests)
+    embedding_backend: str = "bedrock"
     bedrock_region: str = "us-east-1"
     embedding_model: str = "amazon.titan-embed-text-v2:0"
     embedding_dims: int = 1024
@@ -18,6 +20,10 @@ class Settings(BaseSettings):
 
     api_keys: str = ""
     log_level: str = "INFO"
+
+    host: str = "0.0.0.0"
+    mcp_port: int = 8765
+    ingest_port: int = 8766
 
     @property
     def api_key_set(self) -> set[str]:

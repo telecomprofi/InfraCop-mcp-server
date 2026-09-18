@@ -1,0 +1,24 @@
+# Local MCP + ingest HTTP image (amd64/arm64). Not for Lambda.
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml ./
+COPY src ./src
+COPY fixtures ./fixtures
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir .
+
+ENV INFRACOP_EMBEDDING_BACKEND=hash \
+    INFRACOP_EMBEDDING_DIMS=1024 \
+    INFRACOP_QDRANT_URL=http://qdrant:6333 \
+    INFRACOP_HOST=0.0.0.0 \
+    INFRACOP_MCP_PORT=8765 \
+    INFRACOP_INGEST_PORT=8766 \
+    PYTHONUNBUFFERED=1
+
+EXPOSE 8765 8766
+CMD ["infracop-mcp"]

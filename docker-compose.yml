@@ -1,0 +1,90 @@
+# Local InfraCop stack. Run parts independently:
+#   docker compose up qdrant
+#   docker compose up mcp
+#   docker compose up ingest
+#   docker compose up                 # all three
+# One-shot ingest of fixtures (needs qdrant):
+#   docker compose run --rm ingest infracop-ingest --dir /fixtures --release local
+# GitHub release ingest:
+#   docker compose run --rm ingest infracop-ingest v1.0.0
+# MCP against an already-running Qdrant / Qdrant Cloud:
+#   docker compose up mcp --no-deps
+
+name: infracop
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.13.4
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333'"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 8s
+
+  mcp:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile.local
+    image: infracop-local:latest
+    restart: unless-stopped
+    command: ["infracop-mcp"]
+    ports:
+      - "8765:8765"
+    environment:
+      INFRACOP_QDRANT_URL: ${INFRACOP_QDRANT_URL:-http://qdrant:6333}
+      INFRACOP_QDRANT_API_KEY: ${INFRACOP_QDRANT_API_KEY:-}
+      INFRACOP_COLLECTION: ${INFRACOP_COLLECTION:-enterprise_standards}
+      INFRACOP_EMBEDDING_BACKEND: ${INFRACOP_EMBEDDING_BACKEND:-hash}
+      INFRACOP_EMBEDDING_DIMS: ${INFRACOP_EMBEDDING_DIMS:-1024}
+      INFRACOP_API_KEYS: ${INFRACOP_API_KEYS:-}
+      INFRACOP_LOG_LEVEL: ${INFRACOP_LOG_LEVEL:-INFO}
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8765/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+      start_period: 15s
+
+  ingest:
+    image: infracop-local:latest
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile.local
+    restart: unless-stopped
+    command: ["infracop-ingest-http"]
+    ports:
+      - "8766:8766"
+    volumes:
+      - ./mcp-server/fixtures:/fixtures:ro
+    environment:
+      INFRACOP_QDRANT_URL: ${INFRACOP_QDRANT_URL:-http://qdrant:6333}
+      INFRACOP_QDRANT_API_KEY: ${INFRACOP_QDRANT_API_KEY:-}
+      INFRACOP_COLLECTION: ${INFRACOP_COLLECTION:-enterprise_standards}
+      INFRACOP_EMBEDDING_BACKEND: ${INFRACOP_EMBEDDING_BACKEND:-hash}
+      INFRACOP_EMBEDDING_DIMS: ${INFRACOP_EMBEDDING_DIMS:-1024}
+      INFRACOP_STANDARDS_REPO: ${INFRACOP_STANDARDS_REPO:-telecomprofi/Ent-DevOps-Standards}
+      INFRACOP_GITHUB_TOKEN: ${INFRACOP_GITHUB_TOKEN:-}
+      INFRACOP_GITHUB_WEBHOOK_SECRET: ${INFRACOP_GITHUB_WEBHOOK_SECRET:-}
+      INFRACOP_LOG_LEVEL: ${INFRACOP_LOG_LEVEL:-INFO}
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8766/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 8
+      start_period: 10s
+
+volumes:
+  qdrant_data:

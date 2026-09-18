@@ -93,6 +93,57 @@ Internet ──► ALB (public subnets, TLS)
 
 Copy [`.env.example`](.env.example) for local MCP runs. Do not commit secrets.
 
+## Local Docker
+
+Three services, each startable on its own. Hash embeddings are the default so nothing talks to Bedrock.
+
+| Service | What it is | Published |
+| --- | --- | --- |
+| `qdrant` | Vector DB | 6333 (REST), 6334 (gRPC) |
+| `mcp` | MCP HTTP server | 8765 (`/health`, `/mcp`) |
+| `ingest` | Release webhook + CLI | 8766 (`/health`, `POST /ingest`) |
+
+```bash
+cp .env.example .env          # optional
+docker compose up qdrant      # vector DB only
+docker compose up mcp         # MCP (starts Qdrant too)
+docker compose up ingest      # webhook (starts Qdrant too)
+docker compose up -d          # all three
+```
+
+Load the bundled fixture standards (no GitHub required):
+
+```bash
+docker compose run --rm ingest infracop-ingest --dir /fixtures --release local
+```
+
+Or pull a real GitHub release of Ent-DevOps-Standards:
+
+```bash
+docker compose run --rm ingest infracop-ingest v1.0.0
+```
+
+Trigger ingest over HTTP (secret empty = open, local only):
+
+```bash
+curl -sS -X POST http://127.0.0.1:8766/ingest \
+  -H 'content-type: application/json' \
+  -d '{"dir":"/fixtures","release":"local"}'
+```
+
+Point an agent at `http://127.0.0.1:8765/mcp`. Against Qdrant Cloud instead of the local container: set `INFRACOP_QDRANT_URL` in `.env` and `docker compose up mcp --no-deps`.
+
+Same image, no Compose:
+
+```bash
+docker build -f mcp-server/Dockerfile.local -t infracop-local mcp-server
+docker run --rm -p 6333:6333 qdrant/qdrant:v1.13.4
+docker run --rm -p 8765:8765 -e INFRACOP_QDRANT_URL=http://host.docker.internal:6333 infracop-local infracop-mcp
+docker run --rm -p 8766:8766 -e INFRACOP_QDRANT_URL=http://host.docker.internal:6333 infracop-local infracop-ingest-http
+```
+
+`mcp-server/Dockerfile` remains the AWS Lambda production image.
+
 Indicative us-east-1 on-demand cost with 2 NAT Gateways, ALB, VPC endpoints, PC=3, and Qdrant HA: **about $230–290 / month**.
 
 ## Agent config (mandatory)
