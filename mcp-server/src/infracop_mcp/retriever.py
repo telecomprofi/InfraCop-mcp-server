@@ -30,7 +30,12 @@ SYNONYMS = {
 
 @lru_cache(maxsize=1)
 def get_client() -> QdrantClient:
-    return QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key or None, timeout=8.0)
+    return QdrantClient(
+        url=settings.qdrant_url,
+        api_key=settings.qdrant_api_key or None,
+        timeout=8.0,
+        check_compatibility=False,
+    )
 
 
 def _tokens(text: str) -> list[str]:
